@@ -1,0 +1,56 @@
+# Generate ssh key
+system("
+    if [ #{ARGV[0]} = 'up' ]; then
+        ./scripts/ssh_gen.sh
+    fi
+")
+
+Vagrant.configure(2) do |config|
+    # VM with Vagrant Cloud - used CentOS
+    config.vm.box = "centos/stream8"
+    config.vm.box_version = "20210210.0"
+    # The URL that the configured box can be found at
+    config.vm.box_url = "https://app.vagrantup.com/centos/boxes/stream8"
+
+    # Server
+    # VM name
+    config.vm.define "wbryonS" do |server|
+        # If set, Vagrant will update /etc/hosts on the guest with the configured hostname
+        server.vm.hostname = "wbryonS"
+        # Install network on VM
+        server.vm.network "private_network", ip: "192.168.56.110"
+        # VM settings & select provider
+        server.vm.provider "virtualbox" do |v|
+            # Changes the VM's name
+            v.customize ["modifyvm", :id, "--name", "wbryonS"]
+            # Makes the NAT engine proxy all guest DNS requests to the host's DNS servers
+            v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+            # Makes the NAT engine use the host's resolver mechanisms to handle DNS requests
+            v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+            v.memory = 1024
+            v.cpus = 1
+        end
+        #
+        server.vm.provision "file", source: "./key.pub", destination: "/home/vagrant/.ssh/id_rsa.pub"
+        server.vm.provision "file", source: "./key", destination: "/home/vagrant/.ssh/id_rsa"
+        # Command executed after create VM
+        server.vm.provision "shell", run: "always", path: "./scripts/install_server.sh"
+    end
+
+    # ServerWorker
+    config.vm.define "wbryonSW" do |agent|
+        agent.vm.hostname = "wbryonSW"
+        agent.vm.network "private_network", ip: "192.168.56.111"
+        agent.vm.provider "virtualbox" do |v|
+            v.customize ["modifyvm", :id, "--name", "wbryonSW"]
+            v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+            v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+            v.memory = "1024"
+            v.cpus = 1
+        end
+        agent.vm.provision "file", source: "./key.pub", destination: "/home/vagrant/.ssh/id_rsa.pub"
+        agent.vm.provision "file", source: "./key", destination: "/home/vagrant/.ssh/id_rsa"
+        agent.vm.provision "shell", run: "always", path: "./scripts/install_serverworker.sh"
+    end
+
+end
